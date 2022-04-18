@@ -1,9 +1,24 @@
-use crate::{Rank, Suit};
+use crate::text::{Format, IndexableFormat};
+use crate::{Indexable, Rank, Suit};
+use lazy_static::lazy_static;
+use std::fmt::{Display, Formatter};
 
 #[derive(Debug, Default, Hash, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Card {
     pub rank: Rank,
     pub suit: Suit,
+}
+
+const UPPERCASE_VALUES: [&str; 52] = [
+    "AS", "2S", "3S", "4S", "5S", "6S", "7S", "8S", "9S", "10S", "JS", "QS", "KS", "AH", "2H",
+    "3H", "4H", "5H", "6H", "7H", "8H", "9H", "10H", "JH", "QH", "KH", "AD", "2D", "3D", "4D",
+    "5D", "6D", "7D", "8D", "9D", "10D", "JD", "QD", "KD", "AC", "2C", "3C", "4C", "5C", "6C",
+    "7C", "8C", "9C", "10C", "JC", "QC", "KC",
+];
+
+lazy_static! {
+    static ref DEFAULT_FORMAT: IndexableFormat<'static, 52> =
+        IndexableFormat::new(UPPERCASE_VALUES);
 }
 
 impl Card {
@@ -26,13 +41,38 @@ impl Card {
     }
 
     #[must_use]
-    pub fn from_index(index: u8) -> Card {
-        return Card::new((index % 13).into(), (index / 13).into());
+    pub fn new_upper_case_format() -> Box<dyn Format<Card>> {
+        return Box::new(IndexableFormat::new(UPPERCASE_VALUES));
     }
 
     #[must_use]
-    pub fn to_index(&self) -> u8 {
+    pub fn new_lower_case_format() -> Box<dyn Format<Card>> {
+        return Box::new(IndexableFormat::new([
+            "as", "2s", "3s", "4s", "5s", "6s", "7s", "8s", "9s", "10s", "js", "qs", "ks", "ah",
+            "2h", "3h", "4h", "5h", "6h", "7h", "8h", "9h", "10h", "jh", "qh", "kh", "ad", "2d",
+            "3d", "4d", "5d", "6d", "7d", "8d", "9d", "10d", "jd", "qd", "kd", "ac", "2c", "3c",
+            "4c", "5c", "6c", "7c", "8c", "9c", "10c", "jc", "qc", "kc",
+        ]));
+    }
+}
+
+impl Display for Card {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        return DEFAULT_FORMAT.fmt(self, f);
+    }
+}
+
+impl Indexable for Card {
+    fn from_index(index: u8) -> Card {
+        return Card::new((index % 13).into(), (index / 13).into());
+    }
+
+    fn to_index(&self) -> u8 {
         return self.suit as u8 * 13 + self.rank as u8;
+    }
+
+    fn maximum_index() -> u8 {
+        return 51;
     }
 }
 
@@ -45,7 +85,13 @@ mod tests {
     fn new() {
         let card = Card::new(Rank::Five, Suit::Diamonds);
 
-        assert_eq!(card, Card { rank: Rank::Five, suit: Suit::Diamonds });
+        assert_eq!(
+            card,
+            Card {
+                rank: Rank::Five,
+                suit: Suit::Diamonds
+            }
+        );
     }
 
     #[test]
@@ -76,5 +122,45 @@ mod tests {
         let actual = full_deck.map(|c| c.to_index());
 
         assert_eq!(actual.to_vec(), (0..52).collect::<Vec<u8>>());
+    }
+
+    #[test]
+    fn to_string() {
+        assert_eq!(Card::new(Rank::Ace, Suit::Spades).to_string(), "AS");
+        assert_eq!(Card::new(Rank::Ten, Suit::Diamonds).to_string(), "10D");
+    }
+
+    #[test]
+    fn new_upper_case_format() {
+        let format = Card::new_upper_case_format();
+
+        assert_eq!(format.format(&Card::new(Rank::Ace, Suit::Spades)), "AS");
+        assert_eq!(format.format(&Card::new(Rank::Ten, Suit::Diamonds)), "10D");
+
+        assert_eq!(
+            format.parse("AS").unwrap(),
+            Card::new(Rank::Ace, Suit::Spades)
+        );
+        assert_eq!(
+            format.parse("10D").unwrap(),
+            Card::new(Rank::Ten, Suit::Diamonds)
+        );
+    }
+
+    #[test]
+    fn new_lower_case_format() {
+        let format = Card::new_lower_case_format();
+
+        assert_eq!(format.format(&Card::new(Rank::Ace, Suit::Spades)), "as");
+        assert_eq!(format.format(&Card::new(Rank::Ten, Suit::Diamonds)), "10d");
+
+        assert_eq!(
+            format.parse("as").unwrap(),
+            Card::new(Rank::Ace, Suit::Spades)
+        );
+        assert_eq!(
+            format.parse("10d").unwrap(),
+            Card::new(Rank::Ten, Suit::Diamonds)
+        );
     }
 }
